@@ -261,12 +261,17 @@
         const firebaseConfig = {
   apiKey: "AIzaSyDu_F4ue04mfJSQePdnHAU7AXloqwmhSbE",
   authDomain: "jobde-bfdd8.firebaseapp.com",
-  databaseURL: "https://jobde-bfdd8-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "jobde-bfdd8",
-  storageBucket: "jobde-bfdd8.firebasestorage.app",
+  storageBucket: "jobde-bfdd8.appspot.com",
   messagingSenderId: "509145691108",
   appId: "1:509145691108:web:6a403f9d0792b9ff060df1"
 };
+
+// WAJIB ADA INI
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+    
 
         // APP STATE
         let allTasks = [];
@@ -486,6 +491,20 @@
                 sidebar.classList.add('-translate-x-full');
             }
         });
+
+        setTimeout(() => {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+}, 3000);
+
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+    console.log("ERROR:", msg);
+    document.getElementById('loadingOverlay').classList.add('hidden');
+};
+
+    setTimeout(() => {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+}, 2000);
+        
     </script>
 </body>
 </html>
