@@ -199,9 +199,15 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'task_master_pro';
+        // Firebase Configuration Parsing
+        let firebaseConfig = {};
+        try {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } catch (e) {
+            console.error("Gagal memuat konfigurasi Firebase", e);
+        }
         
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'task_master_pro';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -216,18 +222,16 @@
         const mainApp = document.getElementById('mainApp');
         const taskListEl = document.getElementById('taskList');
         const usernameDisplay = document.getElementById('usernameDisplay');
+        const authError = document.getElementById('authError');
 
         // Authentication logic
-        onAuthStateChanged(auth, async (user) => {
+        onAuthStateChanged(auth, (user) => {
             currentUser = user;
-            if (user) {
-                const handle = localStorage.getItem('tm_handle');
-                if (handle) {
-                    setupApp(handle);
-                    subscribeToData(user.uid);
-                } else {
-                    showAuth();
-                }
+            const handle = localStorage.getItem('tm_handle');
+            
+            if (user && handle) {
+                setupApp(handle);
+                subscribeToData(user.uid);
             } else {
                 showAuth();
             }
@@ -247,26 +251,49 @@
         document.getElementById('authForm').onsubmit = async (e) => {
             e.preventDefault();
             const handle = document.getElementById('authUsername').value.trim().toLowerCase();
-            if (handle.length < 3) return;
             
-            localStorage.setItem('tm_handle', handle);
-            if (!auth.currentUser) {
-                await signInAnonymously(auth);
-            } else {
-                setupApp(handle);
-                subscribeToData(auth.currentUser.uid);
+            if (handle.length < 3) {
+                authError.innerText = "Username minimal 3 karakter";
+                authError.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                authError.classList.add('hidden');
+                localStorage.setItem('tm_handle', handle);
+                
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth);
+                } else {
+                    setupApp(handle);
+                    subscribeToData(auth.currentUser.uid);
+                }
+            } catch (err) {
+                console.error("Login Error:", err);
+                authError.innerText = "Terjadi kesalahan saat masuk. Coba lagi.";
+                authError.classList.remove('hidden');
             }
         };
 
         const subscribeToData = (uid) => {
             if (unsubscribeTasks) unsubscribeTasks();
-            const colRef = collection(db, 'artifacts', appId, 'users', uid, 'tasks');
             
-            unsubscribeTasks = onSnapshot(query(colRef), (snap) => {
-                allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                allTasks.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                render();
-            }, (err) => console.error(err));
+            try {
+                const colRef = collection(db, 'artifacts', appId, 'users', uid, 'tasks');
+                unsubscribeTasks = onSnapshot(query(colRef), (snap) => {
+                    allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    allTasks.sort((a, b) => {
+                        const timeA = a.createdAt?.seconds || 0;
+                        const timeB = b.createdAt?.seconds || 0;
+                        return timeB - timeA;
+                    });
+                    render();
+                }, (err) => {
+                    console.error("Firestore error:", err);
+                });
+            } catch (e) {
+                console.error("Gagal subscribe data:", e);
+            }
         };
 
         const formatLocaleDate = (dateStr) => {
@@ -287,14 +314,20 @@
         };
 
         window.render = () => {
-            const search = document.getElementById('searchInput').value.toLowerCase();
+            const searchInput = document.getElementById('searchInput');
+            const search = searchInput ? searchInput.value.toLowerCase() : "";
+            
             const filtered = allTasks.filter(t => {
                 const matchesCat = currentFilter === 'All' || t.category === currentFilter;
                 const matchesSearch = (t.title || "").toLowerCase().includes(search);
                 return matchesCat && matchesSearch;
             });
 
-            document.getElementById('taskCountLabel').innerText = `${filtered.filter(t => t.status === 'Completed').length} dari ${filtered.length} tugas selesai`;
+            const countEl = document.getElementById('taskCountLabel');
+            if (countEl) {
+                const completedCount = filtered.filter(t => t.status === 'Completed').length;
+                countEl.innerText = `${completedCount} dari ${filtered.length} tugas selesai`;
+            }
 
             if (filtered.length === 0) {
                 taskListEl.innerHTML = `<div class="py-20 text-center text-slate-400 font-bold">Belum ada tugas</div>`;
@@ -336,11 +369,13 @@
         };
 
         window.updateStatus = async (id, status) => {
+            if (!currentUser) return;
             const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', id);
             await updateDoc(ref, { status: status === 'Completed' ? 'Pending' : 'Completed', updatedAt: serverTimestamp() });
         };
 
         window.removeTask = async (id) => {
+            if (!currentUser) return;
             const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', id);
             await deleteDoc(ref);
         };
@@ -359,6 +394,8 @@
 
         document.getElementById('taskForm').onsubmit = async (e) => {
             e.preventDefault();
+            if (!currentUser) return;
+
             const id = document.getElementById('editId').value;
             const data = {
                 title: document.getElementById('taskTitle').value,
@@ -392,10 +429,14 @@
         };
         document.getElementById('btnCloseModal').onclick = closeModal;
         document.getElementById('modalBackdrop').onclick = closeModal;
-        document.getElementById('logoutBtn').onclick = () => {
+        
+        document.getElementById('logoutBtn').onclick = async () => {
             localStorage.removeItem('tm_handle');
-            signOut(auth);
+            if (unsubscribeTasks) unsubscribeTasks();
+            await signOut(auth);
+            window.location.reload(); // Paksa reload untuk membersihkan state
         };
+        
         document.getElementById('themeToggle').onclick = () => document.documentElement.classList.toggle('dark');
         document.getElementById('searchInput').oninput = render;
 
