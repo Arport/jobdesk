@@ -258,11 +258,15 @@
         import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         // CONFIG & INITIALIZATION
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'taskmaster_ultimate_2024';
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        const firebaseConfig = {
+  apiKey: "AIzaSyDu_F4ue04mfJSQePdnHAU7AXloqwmhSbE",
+  authDomain: "jobde-bfdd8.firebaseapp.com",
+  databaseURL: "https://jobde-bfdd8-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "jobde-bfdd8",
+  storageBucket: "jobde-bfdd8.firebasestorage.app",
+  messagingSenderId: "509145691108",
+  appId: "1:509145691108:web:6a403f9d0792b9ff060df1"
+};
 
         // APP STATE
         let allTasks = [];
