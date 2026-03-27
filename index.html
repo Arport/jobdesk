@@ -200,15 +200,15 @@
 
     <!-- Firebase SDK & Logic -->
     <script type="module">
-    // Import SDK terbaru yang stabil
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    // Import SDK terbaru
+    import { initializeApp } from "https://jobde-bfdd8-default-rtdb.asia-southeast1.firebasedatabase.app/s";
     import { 
         getAuth, 
         signInWithEmailAndPassword, 
         createUserWithEmailAndPassword, 
         onAuthStateChanged, 
         signOut 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    } from "https://jobde-bfdd8-default-rtdb.asia-southeast1.firebasedatabase.app/";
     import { 
         getFirestore, 
         collection, 
@@ -221,9 +221,8 @@
         onSnapshot, 
         query, 
         serverTimestamp 
-    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    } from "https://jobde-bfdd8-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
-    // Firebase configuration
     const firebaseConfig = {
         apiKey: "AIzaSyDu_F4ue04mfJSQePdnHAU7AXloqwmhSbE",
         authDomain: "jobde-bfdd8.firebaseapp.com",
@@ -233,52 +232,50 @@
         appId: "1:509145691108:web:6a403f9d0792b9ff060df1"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const APP_ID = "task_master_pro"; // Konsisten dengan ID aplikasi Anda
+    const APP_ID = "task_master_pro"; 
 
     let allTasks = [];
     let currentFilter = 'All';
     let currentUser = null;
 
-    // --- AUTH LOGIC (LOGIN DENGAN EMAIL) ---
+    // --- LOGIC LOGIN (USER TETAP INPUT USERNAME) ---
     const authForm = document.getElementById('authForm');
     const authSubmitBtn = document.getElementById('authSubmitBtn');
     const authError = document.getElementById('authError');
 
     authForm.onsubmit = async (e) => {
         e.preventDefault();
+        const username = document.getElementById('authUsername').value.trim().toLowerCase();
         
-        // Mengambil email dari input (pastikan ID di HTML adalah authEmail atau sesuaikan)
-        const email = document.getElementById('authUsername').value.trim(); 
-        const password = "password123"; // Rekomendasi: Tambahkan input password di HTML Anda
-
-        if (email.length < 3) {
-            showError("Masukkan email yang valid");
+        if (username.length < 3) {
+            showError("Username minimal 3 karakter");
             return;
         }
+
+        // Trik: Ubah username jadi format email internal & password statis
+        const virtualEmail = `${username}@yo.com`;
+        const virtualPassword = `pass_${username}`; 
 
         authError.classList.add('hidden');
         authSubmitBtn.disabled = true;
         authSubmitBtn.innerText = 'Menghubungkan...';
 
         try {
-            // Logika: Coba masuk, jika user tidak ada, maka otomatis buat akun baru
             try {
-                await signInWithEmailAndPassword(auth, email, password);
+                // Coba Login
+                await signInWithEmailAndPassword(auth, virtualEmail, virtualPassword);
             } catch (err) {
+                // Jika user belum ada, otomatis Register
                 if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-                    await createUserWithEmailAndPassword(auth, email, password);
+                    await createUserWithEmailAndPassword(auth, virtualEmail, virtualPassword);
                 } else {
                     throw err;
                 }
             }
-
-            // Simpan email ke localStorage untuk sesi sederhana
-            localStorage.setItem('taskmaster_email', email);
-
+            localStorage.setItem('taskmaster_username', username);
         } catch (err) {
             showError("Gagal masuk: " + err.message);
             authSubmitBtn.disabled = false;
@@ -292,7 +289,7 @@
     }
 
     document.getElementById('logoutBtn').onclick = () => {
-        localStorage.removeItem('taskmaster_email');
+        localStorage.removeItem('taskmaster_username');
         signOut(auth);
     };
 
@@ -300,12 +297,11 @@
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             currentUser = user;
+            const savedUsername = localStorage.getItem('taskmaster_username') || user.email.split('@')[0];
             
             document.getElementById('authScreen').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
-            
-            // Menampilkan email sebagai username display
-            document.getElementById('usernameDisplay').innerText = user.email;
+            document.getElementById('usernameDisplay').innerText = "@" + savedUsername;
             
             startDataSubscription(user.uid);
         } else {
@@ -321,17 +317,16 @@
     let unsubscribeTasks = null;
     const startDataSubscription = (uid) => {
         if (unsubscribeTasks) unsubscribeTasks();
-        
-        // Mengikuti struktur path asli Anda
         const taskCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'tasks');
         
         unsubscribeTasks = onSnapshot(query(taskCol), (snapshot) => {
             allTasks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
             allTasks.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             renderTasks();
-        }, (err) => console.error("Firestore Error:", err));
+        }, (err) => console.error(err));
     };
 
+    // Fungsi Render, CRUD, UI Sidebar, dsb tetap sama dengan kode awal Anda
     window.renderTasks = () => {
         const listEl = document.getElementById('taskList');
         const countEl = document.getElementById('taskCountLabel');
@@ -352,9 +347,7 @@
 
         listEl.innerHTML = filtered.map((task, idx) => {
             const isCompleted = task.status === 'Completed';
-            const pColor = task.priority === 'High' ? 'text-red-500 bg-red-100 dark:bg-red-900/20' : 
-                         task.priority === 'Medium' ? 'text-orange-500 bg-orange-100 dark:bg-orange-900/20' : 
-                         'text-green-500 bg-green-100 dark:bg-green-900/20';
+            const pColor = task.priority === 'High' ? 'text-red-500 bg-red-100 dark:bg-red-900/20' : task.priority === 'Medium' ? 'text-orange-500 bg-orange-100 dark:bg-orange-900/20' : 'text-green-500 bg-green-100 dark:bg-green-900/20';
 
             return `
                 <div class="task-card flex items-center gap-4 p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 animate-fade-in" style="animation-delay: ${idx * 0.05}s">
@@ -376,7 +369,6 @@
         }).join('');
     };
 
-    // --- CRUD ACTIONS ---
     window.toggleStatus = async (id, status) => {
         if (!currentUser) return;
         const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks', id);
@@ -405,10 +397,8 @@
     document.getElementById('taskForm').onsubmit = async (e) => {
         e.preventDefault();
         if (!currentUser) return;
-        
         const id = document.getElementById('editId').value;
         const taskCol = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks');
-        
         const payload = {
             title: document.getElementById('taskTitle').value,
             category: document.getElementById('taskCategory').value,
@@ -416,7 +406,6 @@
             description: document.getElementById('taskDesc').value,
             updatedAt: serverTimestamp()
         };
-
         if (id) {
             await updateDoc(doc(taskCol, id), payload);
         } else {
@@ -427,15 +416,12 @@
         closeModal();
     };
 
-    // UI Interactions
     document.getElementById('btnNewTask').onclick = () => {
         document.getElementById('taskForm').reset();
         document.getElementById('editId').value = '';
         document.getElementById('modalTask').classList.remove('hidden');
     };
-
     document.getElementById('searchInput').oninput = renderTasks;
-
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -445,12 +431,9 @@
             renderTasks();
         };
     });
-
     document.getElementById('themeToggle').onclick = () => {
         document.documentElement.classList.toggle('dark');
     };
-
-    // Mobile Sidebar
     document.getElementById('openSidebar').onclick = () => {
         document.getElementById('sidebar').classList.remove('-translate-x-full');
         document.getElementById('sidebarOverlay').classList.remove('hidden');
