@@ -291,7 +291,7 @@ const db = getFirestore(app);
                 document.getElementById('authScreen').classList.add('hidden');
                 document.getElementById('mainApp').classList.remove('hidden'); // Memperbaiki bagian ini
                 document.getElementById('usernameDisplay').innerText = handle;
-                startDataSync(user.uid);
+                startDataSync();
             } else {
                 document.getElementById('authScreen').classList.remove('hidden');
                 document.getElementById('mainApp').classList.add('hidden');
@@ -317,9 +317,10 @@ const db = getFirestore(app);
         };
 
         // DATA SYNC
-        const startDataSync = (uid) => {
+        const startDataSync = () => {
             if (unsubscribeTasks) unsubscribeTasks();
-            const colRef = collection(db, 'artifacts', appId, 'users', uid, 'tasks');
+            const username = localStorage.getItem('tm_handle')?.toLowerCase();
+    const colRef = collection(db, 'users', username, 'tasks');
             unsubscribeTasks = onSnapshot(query(colRef), (snap) => {
                 allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 allTasks.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
@@ -414,13 +415,15 @@ const db = getFirestore(app);
         };
 
         window.toggleStatus = async (id, current) => {
-            const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', id);
+            const username = localStorage.getItem('tm_handle')?.toLowerCase();
+const ref = doc(db, 'artifacts', appId, 'users', username, 'tasks', id);
             await updateDoc(ref, { status: current === 'Completed' ? 'Pending' : 'Completed' });
         };
 
         window.deleteTask = async (id) => {
             if (confirm("Hapus tugas ini secara permanen?")) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks', id));
+                const username = localStorage.getItem('tm_handle')?.toLowerCase();
+await deleteDoc(doc(db, 'artifacts', appId, 'users', username, 'tasks', id));
             }
         };
 
@@ -449,7 +452,8 @@ const db = getFirestore(app);
                 updatedAt: serverTimestamp()
             };
 
-            const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks');
+            const username = localStorage.getItem('tm_handle')?.toLowerCase();
+const colRef = collection(db, 'users', username, 'tasks');
             if (id) {
                 await updateDoc(doc(colRef, id), data);
             } else {
