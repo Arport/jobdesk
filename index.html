@@ -254,11 +254,10 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import { getDatabase, ref, push, set, update, remove, onValue } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 
-        // CONFIG & INITIALIZATION
-        const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyDu_F4ue04mfJSQePdnHAU7AXloqwmhSbE",
   authDomain: "jobde-bfdd8.firebaseapp.com",
   projectId: "jobde-bfdd8",
@@ -267,10 +266,10 @@
   appId: "1:509145691108:web:6a403f9d0792b9ff060df1"
 };
 
-// WAJIB ADA INI
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getDatabase(app);
+
 
         const appId = "taskmaster_ultimate_2024";
 
@@ -284,7 +283,7 @@ const db = getFirestore(app);
         // AUTH CORE
         onAuthStateChanged(auth, async (user) => {
             const handle = localStorage.getItem('tm_handle');
-            setTimeout(() => document.getElementById('loadingOverlay').classList.add('hidden'), 1000);
+            setTimeout(() => document.getElementById('loadingOverlay').classList.add('hidden'), 1500);
             
             if (user && handle) {
                 currentUser = user;
@@ -318,16 +317,24 @@ const db = getFirestore(app);
 
         // DATA SYNC
         const startDataSync = () => {
-            if (unsubscribeTasks) unsubscribeTasks();
-            const username = localStorage.getItem('tm_handle')?.toLowerCase();
-    const colRef = collection(db, 'users', username, 'tasks');
-            unsubscribeTasks = onSnapshot(query(colRef), (snap) => {
-                allTasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                allTasks.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                render();
-            });
-        };
+    const username = localStorage.getItem('tm_handle')?.toLowerCase();
+    if (!username) return;
 
+    // Bersihkan listener lama jika ada
+    if (unsubscribeTasks) unsubscribeTasks(); 
+
+    const tasksRef = ref(db, 'users/' + username + '/tasks');
+
+    // Simpan fungsi unsubscribe dari onValue
+    unsubscribeTasks = onValue(tasksRef, (snapshot) => {
+        const data = snapshot.val() || {};
+        allTasks = Object.keys(data).map(id => ({
+            id,
+            ...data[id]
+        }));
+        render();
+    });
+};
         // RENDER UI
         window.render = () => {
             const search = document.getElementById('searchInput').value.toLowerCase();
@@ -415,17 +422,22 @@ const db = getFirestore(app);
         };
 
         window.toggleStatus = async (id, current) => {
-            const username = localStorage.getItem('tm_handle')?.toLowerCase();
-const ref = doc(db, 'artifacts', appId, 'users', username, 'tasks', id);
-            await updateDoc(ref, { status: current === 'Completed' ? 'Pending' : 'Completed' });
-        };
+    const username = localStorage.getItem('tm_handle')?.toLowerCase();
+    const taskRef = ref(db, 'users/' + username + '/tasks/' + id);
+
+    await update(taskRef, { 
+        status: current === 'Completed' ? 'Pending' : 'Completed' 
+    });
+};
 
         window.deleteTask = async (id) => {
-            if (confirm("Hapus tugas ini secara permanen?")) {
-                const username = localStorage.getItem('tm_handle')?.toLowerCase();
-await deleteDoc(doc(db, 'artifacts', appId, 'users', username, 'tasks', id));
-            }
-        };
+    if (confirm("Hapus tugas ini secara permanen?")) {
+        const username = localStorage.getItem('tm_handle')?.toLowerCase();
+        const taskRef = ref(db, 'users/' + username + '/tasks/' + id);
+
+        await remove(taskRef); // ✅ INI YANG KURANG
+    }
+};
 
         window.openEdit = (id) => {
             const t = allTasks.find(x => x.id === id);
@@ -441,28 +453,42 @@ await deleteDoc(doc(db, 'artifacts', appId, 'users', username, 'tasks', id));
         };
 
         document.getElementById('taskForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const id = document.getElementById('editId').value;
-            const data = {
-                title: document.getElementById('taskTitle').value,
-                category: document.getElementById('taskCategory').value,
-                priority: document.getElementById('taskPriority').value,
-                deadline: document.getElementById('taskDeadline').value,
-                description: document.getElementById('taskDesc').value,
-                updatedAt: serverTimestamp()
-            };
+    e.preventDefault();
+    const id = document.getElementById('editId').value;
+    const username = localStorage.getItem('tm_handle')?.toLowerCase();
 
-            const username = localStorage.getItem('tm_handle')?.toLowerCase();
-const colRef = collection(db, 'users', username, 'tasks');
-            if (id) {
-                await updateDoc(doc(colRef, id), data);
-            } else {
-                data.status = 'Pending';
-                data.createdAt = serverTimestamp();
-                await addDoc(colRef, data);
-            }
-            closeModal();
-        };
+    if (!username) {
+        alert("Sesi berakhir, silakan login kembali.");
+        return;
+    }
+
+    const data = {
+        title: document.getElementById('taskTitle').value.trim(),
+        category: document.getElementById('taskCategory').value,
+        priority: document.getElementById('taskPriority').value,
+        deadline: document.getElementById('taskDeadline').value,
+        description: document.getElementById('taskDesc').value.trim(),
+        updatedAt: Date.now()
+    };
+
+    try {
+        if (id) {
+            const taskRef = ref(db, `users/${username}/tasks/${id}`);
+            await update(taskRef, data);
+        } else {
+            const tasksRef = ref(db, `users/${username}/tasks`);
+            await push(tasksRef, {
+                ...data,
+                status: 'Pending',
+                createdAt: Date.now()
+            });
+        }
+        closeModal();
+    } catch (err) {
+        console.error("Gagal menyimpan tugas:", err);
+        alert("Gagal menyimpan data ke server.");
+    }
+};
 
         // UI HELPERS
         window.closeModal = () => {
@@ -497,19 +523,11 @@ const colRef = collection(db, 'users', username, 'tasks');
             }
         });
 
-        setTimeout(() => {
-    document.getElementById('loadingOverlay').classList.add('hidden');
-}, 3000);
-
         window.onerror = function (msg, url, lineNo, columnNo, error) {
     console.log("ERROR:", msg);
     document.getElementById('loadingOverlay').classList.add('hidden');
 };
 
-    setTimeout(() => {
-    document.getElementById('loadingOverlay').classList.add('hidden');
-}, 2000);
-        
-    </script>
+  </script>
 </body>
 </html>
