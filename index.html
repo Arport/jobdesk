@@ -298,34 +298,54 @@ const db = getDatabase(app);
         });
 
         document.getElementById('authForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const handle = document.getElementById('authUsername').value.trim();
-            const btn = document.getElementById('authSubmitBtn');
-            const err = document.getElementById('authError');
+    e.preventDefault();
+    const handle = document.getElementById('authUsername').value.trim();
+    const btn = document.getElementById('authSubmitBtn');
 
-            try {
-                btn.disabled = true; btn.innerText = "Mengamankan Sesi...";
-                localStorage.setItem('tm_handle', handle);
-                if (!auth.currentUser) await signInAnonymously(auth);
-                else location.reload(); 
-            } catch (error) {
-                err.innerText = "Koneksi terganggu. Silakan coba lagi.";
-                err.classList.remove('hidden');
-                btn.disabled = false; btn.innerText = "Mulai Sekarang";
-            }
-        };
+    if (!handle) return;
+
+    try {
+        btn.disabled = true;
+        btn.innerText = "sinkronisasi...";
+
+        // 1. Simpan username baru ke localStorage
+        localStorage.setItem('tm_handle', handle);
+
+        // 2. Jika belum login ke Firebase, login secara anonim
+        if (!auth.currentUser) {
+            await signInAnonymously(auth);
+        } else {
+            // 3. Jika sudah login tapi ganti username, paksa restart sync
+            startDataSync();
+            
+            // Sembunyikan form login & tampilkan app
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('usernameDisplay').innerText = handle;
+        }
+        
+        btn.disabled = false;
+        btn.innerText = "Mulai Sekarang";
+    } catch (error) {
+        console.error(error);
+        btn.disabled = false;
+    }
+};
 
         // DATA SYNC
         const startDataSync = () => {
-    const username = localStorage.getItem('tm_handle')?.toLowerCase();
-    if (!username) return;
+    const handle = localStorage.getItem('tm_handle');
+    if (!handle) return;
 
-    // Bersihkan listener lama jika ada
-    if (unsubscribeTasks) unsubscribeTasks(); 
+    const username = handle.toLowerCase().trim(); // Pastikan selalu lowercase & bersih dari spasi
+    const tasksRef = ref(db, `users/${username}/tasks`);
 
-    const tasksRef = ref(db, 'users/' + username + '/tasks');
+    // Hapus listener lama jika ada untuk mencegah tabrakan data
+    if (unsubscribeTasks) {
+        unsubscribeTasks(); 
+    }
 
-    // Simpan fungsi unsubscribe dari onValue
+    // onValue mengembalikan fungsi untuk unsubscribe
     unsubscribeTasks = onValue(tasksRef, (snapshot) => {
         const data = snapshot.val() || {};
         allTasks = Object.keys(data).map(id => ({
@@ -333,6 +353,8 @@ const db = getDatabase(app);
             ...data[id]
         }));
         render();
+    }, (error) => {
+        console.error("Sync Error:", error);
     });
 };
         // RENDER UI
@@ -422,8 +444,11 @@ const db = getDatabase(app);
         };
 
         window.toggleStatus = async (id, current) => {
-    const username = localStorage.getItem('tm_handle')?.toLowerCase();
-    const taskRef = ref(db, 'users/' + username + '/tasks/' + id);
+    const handle = localStorage.getItem('tm_handle');
+    if (!handle) return;
+    
+    const username = handle.toLowerCase().trim();
+    const taskRef = ref(db, `users/${username}/tasks/${id}`);
 
     await update(taskRef, { 
         status: current === 'Completed' ? 'Pending' : 'Completed' 
@@ -500,7 +525,11 @@ const db = getDatabase(app);
 
         document.getElementById('btnNewTask').onclick = () => document.getElementById('modalTask').classList.remove('hidden');
         document.getElementById('themeToggle').onclick = () => document.documentElement.classList.toggle('dark');
-        document.getElementById('logoutBtn').onclick = () => { localStorage.clear(); signOut(auth).then(() => location.reload()); };
+        document.getElementById('logoutBtn').onclick = () => { 
+    if (unsubscribeTasks) unsubscribeTasks(); // Matikan sinkronisasi data
+    localStorage.clear(); 
+    signOut(auth).then(() => location.reload()); 
+};
         document.getElementById('searchInput').oninput = render;
 
         document.querySelectorAll('.nav-btn').forEach(btn => {
