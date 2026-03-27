@@ -37,34 +37,30 @@
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen dark:bg-slate-950 dark:text-slate-100" id="appBody">
 
-    <!-- Auth Screens -->
     <div id="authScreen" class="fixed inset-0 z-[100] bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
         <div class="w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 lg:p-10 shadow-2xl border border-slate-200 dark:border-slate-800">
             <div class="text-center mb-8">
                 <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-3xl shadow-lg shadow-blue-600/30 mx-auto mb-4">T</div>
                 <h2 id="authTitle" class="text-2xl font-black">Masuk TaskMaster</h2>
-                <p id="authSubtitle" class="text-slate-500 text-sm mt-2">Gunakan username Anda untuk melanjutkan</p>
+                <p id="authSubtitle" class="text-slate-500 text-sm mt-2">Gunakan email dan password Anda</p>
             </div>
 
-            <form id="authForm" class="space-y-6">
+            <form id="authForm" class="space-y-4">
                 <div>
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2 ml-1">Username</label>
-                    <div class="relative">
-                        <input type="text" id="authUsername" required placeholder="Contoh: budi_santoso" class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 outline-none transition-all font-bold">
-                        <svg class="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                    </div>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2 ml-1">Email</label>
+                    <input type="email" id="authEmail" required placeholder="email@contoh.com" class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 outline-none transition-all font-bold">
+                </div>
+                <div>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-2 ml-1">Password</label>
+                    <input type="password" id="authPassword" required placeholder="••••••••" class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-blue-500 outline-none transition-all font-bold">
                 </div>
                 
                 <div id="authError" class="text-red-500 text-xs font-bold text-center hidden p-3 bg-red-50 dark:bg-red-900/10 rounded-xl"></div>
                 
                 <button type="submit" id="authSubmitBtn" class="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-600/30 hover:bg-blue-700 active:scale-[0.98] transition-all">
-                    Masuk Sekarang
+                    Masuk / Daftar
                 </button>
             </form>
-
-            <div class="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
-                <p class="text-xs text-slate-400 font-medium">Data Anda tersimpan aman di cloud berdasarkan username yang Anda gunakan.</p>
-            </div>
         </div>
     </div>
 
@@ -204,246 +200,265 @@
 
     <!-- Firebase SDK & Logic -->
     <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://jobde-bfdd8-default-rtdb.asia-southeast1.firebasedatabase.app/";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+    // Import SDK terbaru yang stabil
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+        getAuth, 
+        signInWithEmailAndPassword, 
+        createUserWithEmailAndPassword, 
+        onAuthStateChanged, 
+        signOut 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { 
+        getFirestore, 
+        collection, 
+        addDoc, 
+        updateDoc, 
+        deleteDoc, 
+        doc, 
+        getDoc, 
+        setDoc, 
+        onSnapshot, 
+        query, 
+        serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyDu_F4ue04mfJSQePdnHAU7AXloqwmhSbE",
-    authDomain: "jobde-bfdd8.firebaseapp.com",
-    projectId: "jobde-bfdd8",
-    storageBucket: "jobde-bfdd8.firebasestorage.app",
-    messagingSenderId: "509145691108",
-    appId: "1:509145691108:web:6a403f9d0792b9ff060df1"
-  };
+    // Firebase configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyDu_F4ue04mfJSQePdnHAU7AXloqwmhSbE",
+        authDomain: "jobde-bfdd8.firebaseapp.com",
+        projectId: "jobde-bfdd8",
+        storageBucket: "jobde-bfdd8.firebasestorage.app",
+        messagingSenderId: "509145691108",
+        appId: "1:509145691108:web:6a403f9d0792b9ff060df1"
+    };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const APP_ID = "task_master_pro"; // Konsisten dengan ID aplikasi Anda
 
-        let allTasks = [];
-        let currentFilter = 'All';
-        let currentUser = null;
+    let allTasks = [];
+    let currentFilter = 'All';
+    let currentUser = null;
 
-        // --- AUTH LOGIC (LOGIN DENGAN USERNAME) ---
-        const authForm = document.getElementById('authForm');
-        const authSubmitBtn = document.getElementById('authSubmitBtn');
-        const authError = document.getElementById('authError');
+    // --- AUTH LOGIC (LOGIN DENGAN EMAIL) ---
+    const authForm = document.getElementById('authForm');
+    const authSubmitBtn = document.getElementById('authSubmitBtn');
+    const authError = document.getElementById('authError');
 
-        authForm.onsubmit = async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('authUsername').value.trim().toLowerCase();
-            
-            if (username.length < 3) {
-                showError("Username minimal 3 karakter");
-                return;
-            }
+    authForm.onsubmit = async (e) => {
+        e.preventDefault();
+        
+        // Mengambil email dari input (pastikan ID di HTML adalah authEmail atau sesuaikan)
+        const email = document.getElementById('authUsername').value.trim(); 
+        const password = "password123"; // Rekomendasi: Tambahkan input password di HTML Anda
 
-            authError.classList.add('hidden');
-            authSubmitBtn.disabled = true;
-            authSubmitBtn.innerText = 'Menghubungkan...';
-
-            try {
-                // Kita gunakan login anonim agar sistem tetap aman & cloud-based
-                // Kita simpan mapping username -> uid di koleksi publik untuk persistensi data
-                const userCred = await signInAnonymously(auth);
-                const user = userCred.user;
-
-                // Simpan profil username di Firestore
-                const profileRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'settings', 'profile');
-                await setDoc(profileRef, {
-                    username: username,
-                    lastLogin: serverTimestamp()
-                }, { merge: true });
-
-                // Kita juga simpan di localStorage untuk "auto-login" sederhana di sesi ini
-                localStorage.setItem('taskmaster_username', username);
-
-            } catch (err) {
-                showError("Gagal masuk: " + err.message);
-                authSubmitBtn.disabled = false;
-                authSubmitBtn.innerText = 'Masuk Sekarang';
-            }
-        };
-
-        function showError(msg) {
-            authError.innerText = msg;
-            authError.classList.remove('hidden');
+        if (email.length < 3) {
+            showError("Masukkan email yang valid");
+            return;
         }
 
-        document.getElementById('logoutBtn').onclick = () => {
-            localStorage.removeItem('taskmaster_username');
-            signOut(auth);
-        };
+        authError.classList.add('hidden');
+        authSubmitBtn.disabled = true;
+        authSubmitBtn.innerText = 'Menghubungkan...';
 
-        // --- AUTH OBSERVER ---
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUser = user;
-                
-                // Ambil data profil untuk menampilkan username yang benar
-                const profileRef = doc(db, 'artifacts', APP_ID, 'users', user.uid, 'settings', 'profile');
-                const profileSnap = await getDoc(profileRef);
-                
-                let displayName = "User";
-                if (profileSnap.exists()) {
-                    displayName = profileSnap.data().username;
+        try {
+            // Logika: Coba masuk, jika user tidak ada, maka otomatis buat akun baru
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (err) {
+                if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+                    await createUserWithEmailAndPassword(auth, email, password);
                 } else {
-                    displayName = localStorage.getItem('taskmaster_username') || "User";
+                    throw err;
                 }
-
-                document.getElementById('authScreen').classList.add('hidden');
-                document.getElementById('mainApp').classList.remove('hidden');
-                document.getElementById('usernameDisplay').innerText = "@" + displayName;
-                startDataSubscription(user.uid);
-            } else {
-                currentUser = null;
-                document.getElementById('authScreen').classList.remove('hidden');
-                document.getElementById('mainApp').classList.add('hidden');
-                authSubmitBtn.disabled = false;
-                authSubmitBtn.innerText = 'Masuk Sekarang';
             }
+
+            // Simpan email ke localStorage untuk sesi sederhana
+            localStorage.setItem('taskmaster_email', email);
+
+        } catch (err) {
+            showError("Gagal masuk: " + err.message);
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.innerText = 'Masuk Sekarang';
+        }
+    };
+
+    function showError(msg) {
+        authError.innerText = msg;
+        authError.classList.remove('hidden');
+    }
+
+    document.getElementById('logoutBtn').onclick = () => {
+        localStorage.removeItem('taskmaster_email');
+        signOut(auth);
+    };
+
+    // --- AUTH OBSERVER ---
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUser = user;
+            
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            
+            // Menampilkan email sebagai username display
+            document.getElementById('usernameDisplay').innerText = user.email;
+            
+            startDataSubscription(user.uid);
+        } else {
+            currentUser = null;
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.innerText = 'Masuk Sekarang';
+        }
+    });
+
+    // --- FIRESTORE DATA ---
+    let unsubscribeTasks = null;
+    const startDataSubscription = (uid) => {
+        if (unsubscribeTasks) unsubscribeTasks();
+        
+        // Mengikuti struktur path asli Anda
+        const taskCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'tasks');
+        
+        unsubscribeTasks = onSnapshot(query(taskCol), (snapshot) => {
+            allTasks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            allTasks.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            renderTasks();
+        }, (err) => console.error("Firestore Error:", err));
+    };
+
+    window.renderTasks = () => {
+        const listEl = document.getElementById('taskList');
+        const countEl = document.getElementById('taskCountLabel');
+        const searchVal = document.getElementById('searchInput').value.toLowerCase();
+        
+        const filtered = allTasks.filter(t => {
+            const matchCat = currentFilter === 'All' || t.category === currentFilter;
+            const matchSearch = (t.title || "").toLowerCase().includes(searchVal);
+            return matchCat && matchSearch;
         });
 
-        // --- FIRESTORE DATA ---
-        let unsubscribeTasks = null;
-        const startDataSubscription = (uid) => {
-            if (unsubscribeTasks) unsubscribeTasks();
-            const taskCol = collection(db, 'artifacts', APP_ID, 'users', uid, 'tasks');
-            
-            unsubscribeTasks = onSnapshot(query(taskCol), (snapshot) => {
-                allTasks = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                allTasks.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                renderTasks();
-            }, (err) => console.error(err));
-        };
+        countEl.innerText = `${filtered.filter(t => t.status === 'Completed').length} dari ${filtered.length} tugas selesai`;
 
-        window.renderTasks = () => {
-            const listEl = document.getElementById('taskList');
-            const countEl = document.getElementById('taskCountLabel');
-            const searchVal = document.getElementById('searchInput').value.toLowerCase();
-            
-            const filtered = allTasks.filter(t => {
-                const matchCat = currentFilter === 'All' || t.category === currentFilter;
-                const matchSearch = (t.title || "").toLowerCase().includes(searchVal);
-                return matchCat && matchSearch;
-            });
+        if (filtered.length === 0) {
+            listEl.innerHTML = `<div class="p-20 text-center text-slate-400 font-bold">Belum ada tugas</div>`;
+            return;
+        }
 
-            countEl.innerText = `${filtered.filter(t => t.status === 'Completed').length} dari ${filtered.length} tugas selesai`;
+        listEl.innerHTML = filtered.map((task, idx) => {
+            const isCompleted = task.status === 'Completed';
+            const pColor = task.priority === 'High' ? 'text-red-500 bg-red-100 dark:bg-red-900/20' : 
+                         task.priority === 'Medium' ? 'text-orange-500 bg-orange-100 dark:bg-orange-900/20' : 
+                         'text-green-500 bg-green-100 dark:bg-green-900/20';
 
-            if (filtered.length === 0) {
-                listEl.innerHTML = `<div class="p-20 text-center text-slate-400 font-bold">Belum ada tugas</div>`;
-                return;
-            }
-
-            listEl.innerHTML = filtered.map((task, idx) => {
-                const isCompleted = task.status === 'Completed';
-                const pColor = task.priority === 'High' ? 'text-red-500 bg-red-100 dark:bg-red-900/20' : task.priority === 'Medium' ? 'text-orange-500 bg-orange-100 dark:bg-orange-900/20' : 'text-green-500 bg-green-100 dark:bg-green-900/20';
-
-                return `
-                    <div class="task-card flex items-center gap-4 p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 animate-fade-in" style="animation-delay: ${idx * 0.05}s">
-                        <button onclick="toggleStatus('${task.id}', '${task.status}')" class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300 text-transparent'}">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                        </button>
-                        <div class="flex-1 cursor-pointer" onclick="editTask('${task.id}')">
-                            <div class="flex gap-2 items-center mb-1">
-                                <span class="text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${pColor}">${task.priority}</span>
-                                <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">${task.category}</span>
-                            </div>
-                            <h3 class="font-bold text-sm lg:text-base ${isCompleted ? 'line-through opacity-40' : ''}">${task.title}</h3>
+            return `
+                <div class="task-card flex items-center gap-4 p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 animate-fade-in" style="animation-delay: ${idx * 0.05}s">
+                    <button onclick="toggleStatus('${task.id}', '${task.status}')" class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300 text-transparent'}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                    </button>
+                    <div class="flex-1 cursor-pointer" onclick="editTask('${task.id}')">
+                        <div class="flex gap-2 items-center mb-1">
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${pColor}">${task.priority}</span>
+                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">${task.category}</span>
                         </div>
-                        <button onclick="deleteTask('${task.id}')" class="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        </button>
+                        <h3 class="font-bold text-sm lg:text-base ${isCompleted ? 'line-through opacity-40' : ''}">${task.title}</h3>
                     </div>
-                `;
-            }).join('');
+                    <button onclick="deleteTask('${task.id}')" class="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    };
+
+    // --- CRUD ACTIONS ---
+    window.toggleStatus = async (id, status) => {
+        if (!currentUser) return;
+        const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks', id);
+        await updateDoc(docRef, { status: status === 'Completed' ? 'Pending' : 'Completed' });
+    };
+
+    window.deleteTask = async (id) => {
+        if (!currentUser || !confirm('Hapus tugas ini?')) return;
+        const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks', id);
+        await deleteDoc(docRef);
+    };
+
+    window.editTask = (id) => {
+        const task = allTasks.find(t => t.id === id);
+        if (!task) return;
+        document.getElementById('editId').value = task.id;
+        document.getElementById('taskTitle').value = task.title;
+        document.getElementById('taskCategory').value = task.category;
+        document.getElementById('taskPriority').value = task.priority;
+        document.getElementById('taskDesc').value = task.description || '';
+        document.getElementById('modalTask').classList.remove('hidden');
+    };
+
+    window.closeModal = () => document.getElementById('modalTask').classList.add('hidden');
+
+    document.getElementById('taskForm').onsubmit = async (e) => {
+        e.preventDefault();
+        if (!currentUser) return;
+        
+        const id = document.getElementById('editId').value;
+        const taskCol = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks');
+        
+        const payload = {
+            title: document.getElementById('taskTitle').value,
+            category: document.getElementById('taskCategory').value,
+            priority: document.getElementById('taskPriority').value,
+            description: document.getElementById('taskDesc').value,
+            updatedAt: serverTimestamp()
         };
 
-        // --- CRUD ACTIONS ---
-        window.toggleStatus = async (id, status) => {
-            if (!currentUser) return;
-            const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks', id);
-            await updateDoc(docRef, { status: status === 'Completed' ? 'Pending' : 'Completed' });
+        if (id) {
+            await updateDoc(doc(taskCol, id), payload);
+        } else {
+            payload.status = 'Pending';
+            payload.createdAt = serverTimestamp();
+            await addDoc(taskCol, payload);
+        }
+        closeModal();
+    };
+
+    // UI Interactions
+    document.getElementById('btnNewTask').onclick = () => {
+        document.getElementById('taskForm').reset();
+        document.getElementById('editId').value = '';
+        document.getElementById('modalTask').classList.remove('hidden');
+    };
+
+    document.getElementById('searchInput').oninput = renderTasks;
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFilter = btn.dataset.cat;
+            document.getElementById('currentCategoryTitle').innerText = btn.querySelector('span').innerText;
+            renderTasks();
         };
+    });
 
-        window.deleteTask = async (id) => {
-            if (!currentUser || !confirm('Hapus tugas ini?')) return;
-            const docRef = doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks', id);
-            await deleteDoc(docRef);
-        };
+    document.getElementById('themeToggle').onclick = () => {
+        document.documentElement.classList.toggle('dark');
+    };
 
-        window.editTask = (id) => {
-            const task = allTasks.find(t => t.id === id);
-            if (!task) return;
-            document.getElementById('editId').value = task.id;
-            document.getElementById('taskTitle').value = task.title;
-            document.getElementById('taskCategory').value = task.category;
-            document.getElementById('taskPriority').value = task.priority;
-            document.getElementById('taskDesc').value = task.description || '';
-            document.getElementById('modalTask').classList.remove('hidden');
-        };
-
-        window.closeModal = () => document.getElementById('modalTask').classList.add('hidden');
-
-        document.getElementById('taskForm').onsubmit = async (e) => {
-            e.preventDefault();
-            if (!currentUser) return;
-            
-            const id = document.getElementById('editId').value;
-            const taskCol = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'tasks');
-            
-            const payload = {
-                title: document.getElementById('taskTitle').value,
-                category: document.getElementById('taskCategory').value,
-                priority: document.getElementById('taskPriority').value,
-                description: document.getElementById('taskDesc').value,
-                updatedAt: serverTimestamp()
-            };
-
-            if (id) {
-                await updateDoc(doc(taskCol, id), payload);
-            } else {
-                payload.status = 'Pending';
-                payload.createdAt = serverTimestamp();
-                await addDoc(taskCol, payload);
-            }
-            closeModal();
-        };
-
-        // UI Interactions
-        document.getElementById('btnNewTask').onclick = () => {
-            document.getElementById('taskForm').reset();
-            document.getElementById('editId').value = '';
-            document.getElementById('modalTask').classList.remove('hidden');
-        };
-
-        document.getElementById('searchInput').oninput = renderTasks;
-
-        document.querySelectorAll('.nav-btn').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFilter = btn.dataset.cat;
-                document.getElementById('currentCategoryTitle').innerText = btn.querySelector('span').innerText;
-                renderTasks();
-            };
-        });
-
-        document.getElementById('themeToggle').onclick = () => {
-            document.documentElement.classList.toggle('dark');
-        };
-
-        // Mobile Sidebar
-        document.getElementById('openSidebar').onclick = () => {
-            document.getElementById('sidebar').classList.remove('-translate-x-full');
-            document.getElementById('sidebarOverlay').classList.remove('hidden');
-        };
-        document.getElementById('closeSidebar').onclick = document.getElementById('sidebarOverlay').onclick = () => {
-            document.getElementById('sidebar').classList.add('-translate-x-full');
-            document.getElementById('sidebarOverlay').classList.add('hidden');
-        };
-    </script>
+    // Mobile Sidebar
+    document.getElementById('openSidebar').onclick = () => {
+        document.getElementById('sidebar').classList.remove('-translate-x-full');
+        document.getElementById('sidebarOverlay').classList.remove('hidden');
+    };
+    document.getElementById('closeSidebar').onclick = document.getElementById('sidebarOverlay').onclick = () => {
+        document.getElementById('sidebar').classList.add('-translate-x-full');
+        document.getElementById('sidebarOverlay').classList.add('hidden');
+    };
+</script>
 </body>
 </html>
